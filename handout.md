@@ -15,6 +15,55 @@ Wir verwenden durchgehend die SharePoint-Begriffe so, wie sie im Code stehen
 
 ---
 
+## Infrastruktur — Zugriff auf den Test-SharePoint
+
+Der Test-SharePoint ist nur über seinen internen Hostnamen erreichbar und im Netz
+**nicht per DNS bekannt**. Damit Browser, `gulp serve` und die REST-Aufrufe den
+Namen auflösen können, muss auf **jedem Teilnehmerrechner einmalig** ein Eintrag in
+die HOSTS-Datei:
+
+| Hostname | IP-Adresse |
+|---|---|
+| `sharepoint.pangaea.local` | `192.168.2.212` |
+
+### HOSTS-Eintrag setzen (Administratorrechte nötig)
+
+PowerShell **als Administrator** öffnen und die Zeile anhängen:
+
+```pwsh
+Add-Content -Path "$env:windir\System32\drivers\etc\hosts" -Value "192.168.2.212`tsharepoint.pangaea.local"
+```
+
+(Das `` `t `` erzeugt einen Tabulator zwischen IP und Name.)
+
+Alternativ die Datei `C:\Windows\System32\drivers\etc\hosts` von Hand in einem
+**als Administrator** gestarteten Editor öffnen und diese Zeile ergänzen:
+
+```
+192.168.2.212    sharepoint.pangaea.local
+```
+
+### Prüfen
+
+```pwsh
+ping sharepoint.pangaea.local
+```
+
+Entscheidend ist, dass der Name zu `192.168.2.212` **aufgelöst** wird. Ob die
+Ping-Pakete selbst beantwortet werden, ist nebensächlich (ICMP kann geblockt sein).
+
+Danach ist der Server im Browser erreichbar — die Workshop-Site und die
+SharePoint-Workbench liegen unter diesem Host:
+
+```
+https://sharepoint.pangaea.local/sites/<workshop-site>/_layouts/15/workbench.aspx
+```
+
+> Überall im weiteren Verlauf, wo `<server>` steht (z. B. in Teil 4 und Teil 5),
+> ist `sharepoint.pangaea.local` gemeint.
+
+---
+
 ## Teil 0 — Vorbereitung (5 min)
 
 Neues, kurzes Arbeitsverzeichnis — **nicht** in OneDrive:
