@@ -465,6 +465,55 @@ private _bearbeiten(id: number, titel: string): Promise<void> {
 }
 ```
 
+> **`IF-MATCH` ist mehr als Pflichtprogramm — es ist optimistische
+> Nebenläufigkeitskontrolle.** Jedes Listenelement trägt ein **ETag**: eine
+> Versionskennung, die SharePoint bei jeder Änderung hochzählt. Der
+> `IF-MATCH`-Header legt fest, *unter welcher Bedingung* geschrieben werden darf:
+>
+> - `IF-MATCH: '*'` → schreiben **ohne** Prüfung. Das ist **last-write-wins**: Hat
+>   jemand zwischenzeitlich geändert, wird seine Änderung kommentarlos überschrieben.
+> - `IF-MATCH: '<etag>'` → schreiben **nur**, wenn das Element noch exakt die
+>   Version hat, die ich gelesen habe. Sonst lehnt SharePoint mit **HTTP 412
+>   Precondition Failed** ab — und **nichts** wird überschrieben.
+>
+> „Optimistisch" heißt: Das Element wird beim Bearbeiten **nicht gesperrt**.
+> Geprüft wird erst beim Speichern. Das ist im Web der Normalfall — man kann einen
+> Datensatz nicht blockieren, nur weil bei jemandem ein Formular offen steht.
+
+So sieht das optimistische Speichern aus. Voraussetzung: beim Lesen das ETag pro
+Element **mitnehmen** — dazu `odata=minimalmetadata` statt `nometadata`, dann steht
+in jedem Element ein Feld `odata.etag` (z. B. `"4"`):
+
+```typescript
+private _bearbeitenGeprueft(id: number, titel: string, etag: string): Promise<void> {
+  const url: string = this.context.pageContext.web.absoluteUrl
+    + "/_api/web/lists(guid'" + this.properties.listId + "')/items(" + id + ")";
+
+  return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
+    headers: {
+      'Accept': 'application/json;odata=nometadata',
+      'Content-type': 'application/json;odata=nometadata',
+      'odata-version': '',
+      'IF-MATCH': etag,            // das gemerkte ETag statt '*'
+      'X-HTTP-Method': 'MERGE'
+    },
+    body: JSON.stringify({ Title: titel })
+  }).then((antwort: SPHttpClientResponse): void => {
+    if (antwort.status === 412) {
+      throw new Error('Der Eintrag wurde zwischenzeitlich von jemand anderem '
+        + 'geändert. Bitte neu laden und die Änderung erneut eingeben.');
+    }
+    if (!antwort.ok) { throw new Error('Bearbeiten fehlgeschlagen: ' + antwort.status); }
+  });
+}
+```
+
+> **Im Workshop** bleiben wir der Einfachheit halber bei `'*'`. Wer das echte
+> optimistische Speichern zeigen will, liest die Liste mit `odata=minimalmetadata`,
+> merkt sich pro Zeile das `odata.etag` und reicht es hier herein. Der 412-Zweig
+> ist dann das Erfolgserlebnis: zwei Browser-Tabs nebeneinander, im einen ändern,
+> im anderen speichern → saubere Fehlermeldung statt stillem Überschreiben.
+
 ### 6c) Löschen (DELETE)
 
 Kein Body, Header `X-HTTP-Method: DELETE`:
@@ -477,6 +526,30 @@ private _loeschen(id: number): Promise<void> {
   return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
     headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
   }).then((antwort: SPHttpClientResponse): void => {
+    if (!antwort.ok) { throw new Error('Löschen fehlgeschlagen: ' + antwort.status); }
+  });
+}
+```
+
+> **Beim Löschen lohnt sich `IF-MATCH` genauso.** `IF-MATCH: '*'` löscht
+> bedingungslos. `IF-MATCH: '<etag>'` löscht **nur**, wenn das Element seit dem
+> Lesen unverändert ist — sonst **412**. Das schützt davor, fremde frische Arbeit
+> wegzuwerfen: Du siehst eine Aufgabe „Offen" und willst sie entfernen; in der
+> Zwischenzeit hat ein Kollege sie auf „In Arbeit" gesetzt und Details ergänzt. Mit
+> dem ETag-Check scheitert dein Löschen mit 412, statt seine Änderung zu vernichten.
+
+```typescript
+private _loeschenGeprueft(id: number, etag: string): Promise<void> {
+  const url: string = this.context.pageContext.web.absoluteUrl
+    + "/_api/web/lists(guid'" + this.properties.listId + "')/items(" + id + ")";
+
+  return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
+    headers: { 'IF-MATCH': etag, 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
+  }).then((antwort: SPHttpClientResponse): void => {
+    if (antwort.status === 412) {
+      throw new Error('Der Eintrag wurde zwischenzeitlich geändert. Bitte prüfen, '
+        + 'ob das Löschen noch gewünscht ist.');
+    }
     if (!antwort.ok) { throw new Error('Löschen fehlgeschlagen: ' + antwort.status); }
   });
 }
