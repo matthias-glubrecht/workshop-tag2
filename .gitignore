@@ -1,0 +1,12 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+
+# Falls jemand das Beispielprojekt hier ablegt — nicht mitchecken
+node_modules/
+lib/
+dist/
+temp/
+*.sppkg
