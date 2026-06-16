@@ -1,26 +1,34 @@
-# Handout — Das Web Part „Listenpflege"
+# Handout — Ein Web Part zur Listenpflege
 
-> Schritt für Schritt vom leeren Ordner zu einem Web Part, das die Einträge einer
-> SharePoint-Liste anzeigt und das **Anlegen, Bearbeiten und Löschen** erlaubt.
-> Wenn etwas klemmt: die fertigen Dateien liegen in
-> [loesung-vanilla.md](loesung-vanilla.md) (mit `SPHttpClient`),
-> [loesung-pnp.md](loesung-pnp.md) (mit `@pnp/sp`) und
-> [loesung-react.md](loesung-react.md) (React).
+Diese Anleitung beschreibt Schritt für Schritt, wie ein einfaches Web Part zur
+Listenpflege entsteht. Wir bauen es gemeinsam vom leeren Ordner bis zu einem
+kleinen, aber vollständigen Werkzeug, das die Einträge einer SharePoint-Liste
+anzeigt und das **Anlegen, Bearbeiten und Löschen** erlaubt. Dabei wird jeder
+Schritt genau erklärt, und jede Entscheidung, die unterwegs zu treffen ist, wird
+ausführlich begründet — so bleibt stets nachvollziehbar, *warum* wir etwas tun,
+nicht nur, *dass* wir es tun.
 
-**Faustregel für den ganzen Tag**: Nach jeder Änderung im Browser **hart neu laden**
-(`Strg+Shift+R`). SPFx cached aggressiv.
+Sollte einmal etwas klemmen, liegen die fertigen Dateien zum Vergleich bereit: in
+[loesung-vanilla.md](loesung-vanilla.md) (mit `SPHttpClient`),
+[loesung-pnp.md](loesung-pnp.md) (mit `@pnp/sp`) und
+[loesung-react.md](loesung-react.md) (in React).
 
-Wir verwenden durchgehend die SharePoint-Begriffe so, wie sie im Code stehen
-(`render`, `properties`, `SPHttpClient`), damit nichts mental übersetzt werden muss.
+Zwei Dinge begleiten uns den ganzen Tag. Erstens: Nach jeder Änderung laden wir die
+Seite im Browser **hart neu** (`Strg+Shift+R`), denn SPFx hält Dateien hartnäckig
+im Cache. Zweitens: Wir benennen die Bausteine durchgehend so, wie sie auch im Code
+heißen (`render`, `properties`, `SPHttpClient`) — dann muss niemand zwischen dem
+deutschen Begriff und dem Code-Bezeichner hin- und herübersetzen.
 
 ---
 
 ## Infrastruktur — Zugriff auf den Test-SharePoint
 
-Der Test-SharePoint ist nur über seinen internen Hostnamen erreichbar und im Netz
-**nicht per DNS bekannt**. Damit Browser, `gulp serve` und die REST-Aufrufe den
-Namen auflösen können, muss auf **jedem Teilnehmerrechner einmalig** ein Eintrag in
-die HOSTS-Datei:
+Bevor wir mit dem Bauen beginnen, stellen wir sicher, dass unser Rechner den
+Test-SharePoint überhaupt erreichen kann. Dieser Server ist nur über seinen
+internen Hostnamen ansprechbar und im Netz **nicht per DNS bekannt** — sein Name
+ist also nirgends zentral hinterlegt. Damit Browser, `gulp serve` und die
+REST-Aufrufe den Namen trotzdem auflösen können, tragen wir ihn auf **jedem
+Teilnehmerrechner einmalig** von Hand in die HOSTS-Datei ein:
 
 | Hostname | IP-Adresse |
 |---|---|
@@ -66,7 +74,10 @@ https://sharepoint.pangaea.local/sites/<workshop-site>/_layouts/15/workbench.asp
 
 ## Teil 0 — Vorbereitung (5 min)
 
-Neues, kurzes Arbeitsverzeichnis — **nicht** in OneDrive:
+Zunächst legen wir ein Arbeitsverzeichnis an, in dem alle Dateien unseres Projekts
+abgelegt werden. Wir wählen dafür bewusst einen **kurzen Pfad** und meiden OneDrive
+— synchronisierte Pfade führen bei SPFx erfahrungsgemäß zu schwer auffindbaren
+Problemen.
 
 ```pwsh
 fnm use 8.17.0
@@ -85,11 +96,16 @@ npm install -g yo gulp@3 @microsoft/generator-sharepoint@1.4.1
 
 ## Teil 1 — Projekt scaffolden (Block 1, ~25 min)
 
+Ein SPFx-Projekt schreibt man nicht von Hand, sondern lässt sich das Grundgerüst
+von einem Generator erzeugen — dem Yeoman-Generator für SharePoint. Er stellt uns
+eine Reihe Fragen und legt daraus ein vollständiges, sofort lauffähiges Projekt an.
+Wir starten ihn mit:
+
 ```pwsh
 yo @microsoft/sharepoint
 ```
 
-Antworten im Assistenten:
+und beantworten seine Fragen wie folgt:
 
 | Frage | Antwort |
 |---|---|
@@ -135,9 +151,15 @@ heute baut darauf auf.
 
 ---
 
-## Teil 2 — Zum Laufen bringen (Block 2, ~30 min) → Meilenstein: Web Part rendert
+## Teil 2 — Zum Laufen bringen (Block 2, ~30 min)
 
-Die lokale Workbench braucht ein Zertifikat (einmalig pro Maschine):
+Bevor wir eigenen Code schreiben, bringen wir das frisch erzeugte Web Part einmal
+zum Laufen. So überzeugen wir uns früh davon, dass die gesamte Werkzeugkette
+funktioniert — und sehen am Ende dieses Teils unser Web Part zum ersten Mal in der
+Workbench.
+
+Die lokale Workbench benötigt zunächst ein Entwicklungs-Zertifikat. Das richten wir
+einmalig pro Maschine ein:
 
 ```pwsh
 gulp trust-dev-cert
@@ -180,10 +202,16 @@ Speichern → `gulp serve` rebuildet automatisch → Browser hart neu laden
 
 ---
 
-## Teil 3 — Property Pane: Listenname als Textfeld (Block 3, ~30 min) → Meilenstein: Konfiguration greift
+## Teil 3 — Property Pane: Listenname als Textfeld (Block 3, ~30 min)
 
-Ziel: Im Bearbeiten-Bereich rechts soll ein **Listenname** eingetragen werden
-können. Den brauchen wir in Teil 4 zum Lesen.
+Web Parts besitzen eine sogenannte Property Pane — den Bereich, der beim Bearbeiten
+einer Seite rechts aufklappt und in dem Benutzer das Web Part konfigurieren. In
+diesem Teil geben wir unserem Web Part seine erste Konfigurationseigenschaft (eine
+Web-Part-Property): einen **Listennamen**. Diesen Namen verwenden wir anschließend
+in Teil 4, um die passende Liste auszulesen.
+
+Wir gehen dazu in drei kleinen Schritten vor: die Eigenschaft im Code deklarieren,
+ein Eingabefeld in der Property Pane anbieten und den eingegebenen Wert anzeigen.
 
 ### 3a) Property deklarieren
 
@@ -239,12 +267,18 @@ Konfiguration kommt also als `this.properties.xxx` in `render()` an.
 
 ---
 
-## Teil 4 — Liste lesen und anzeigen (Block 4, ~60 min) → Meilenstein: echte Daten
+## Teil 4 — Liste lesen und anzeigen (Block 4, ~60 min)
+
+Jetzt wird es spannend: Wir holen zum ersten Mal echte Daten aus SharePoint. Dafür
+brauchen wir zweierlei — eine Liste, die wir auslesen können, und den Code, der das
+tut. Also legen wir zunächst eine Test-Liste an und lesen sie anschließend über die
+REST-Schnittstelle von SharePoint aus.
 
 ### 4a) Test-Liste anlegen (einmalig)
 
-In der echten Site (nicht der lokalen Workbench, z. B.
-`https://<server>/sites/dev`): Liste **Aufgaben** anlegen (Typ „Liste").
+Wir beginnen mit der Datenquelle. In der echten Site (nicht der lokalen Workbench,
+z. B. `https://<server>/sites/dev`) legen wir eine Liste **Aufgaben** an (Typ
+„Liste").
 
 Damit die Tabelle später beim Bonus etwas hergibt, lohnen sich Spalten mit
 verschiedenen Typen — alle kommen direkt per REST zurück:
@@ -333,11 +367,14 @@ Einträgen.
 
 ---
 
-## Teil 5 — Property Pane: echter Listen-Selektor (Block 5, ~30 min) → Meilenstein: Auswahl statt Tippen
+## Teil 5 — Property Pane: echter Listen-Selektor (Block 5, ~30 min)
 
-Ein Textfeld ist fehleranfällig (Tippfehler, Groß-/Kleinschreibung). Besser: ein
-Dropdown aller Listen der Site. Das liefert `PropertyFieldListPicker` aus den
-**SPFx Property Controls** — fertig nutzbar, kein Eigenbau.
+Den Listennamen von Hand einzutippen ist bequem, aber fehleranfällig — ein
+Tippfehler oder die falsche Groß-/Kleinschreibung, und nichts wird gefunden. In
+diesem Teil ersetzen wir das Textfeld deshalb durch einen echten Listen-Selektor:
+ein Auswahlfeld, das uns alle Listen der Site zur Auswahl anbietet.
+Praktischerweise müssen wir dieses Steuerelement nicht selbst bauen — es steckt
+fertig in den **SPFx Property Controls** und heißt dort `PropertyFieldListPicker`.
 
 ### 5a) Paket installieren
 
@@ -407,10 +444,18 @@ die Tabelle lädt. Kein Listenname mehr zu tippen.
 
 ---
 
-## Teil 6 — Anlegen, Bearbeiten, Löschen (Block 6, ~75 min) → Meilenstein: vollständiges CRUD
+## Teil 6 — Anlegen, Bearbeiten, Löschen (Block 6, ~75 min)
 
-Bisher nur Lesen (`GET`). Jetzt die drei schreibenden Operationen. Alle gehen über
-`spHttpClient.post(...)`; die Unterscheidung steckt in den **Headern**.
+Bisher haben wir nur gelesen. In diesem Teil bringen wir unserem Web Part bei, die
+Daten auch zu verändern: neue Einträge anzulegen, bestehende zu bearbeiten und
+welche zu löschen. Damit ist die Listenpflege vollständig — Fachleute fassen diese
+vier Grundoperationen (Lesen, Erstellen, Ändern, Löschen) unter dem Kürzel **CRUD**
+zusammen.
+
+Alle drei schreibenden Operationen laufen über denselben Aufruf,
+`spHttpClient.post(...)`. Was sie unterscheidet, sind nicht etwa verschiedene
+Methoden, sondern die mitgeschickten **HTTP-Header** — ein Detail, das wir uns gleich
+genauer ansehen.
 
 > **Digest**: Schreibende SharePoint-Aufrufe brauchen ein Sicherheits-Token
 > (`X-RequestDigest`). Gute Nachricht: `SPHttpClient` setzt es **automatisch** —
@@ -568,11 +613,17 @@ Verdrahtung (Event-Handler an die per `innerHTML` erzeugten Buttons) steht in
 
 ---
 
-## Teil 7 — Gegenüberstellung `@pnp/sp` (Block 7, ~45 min) → Meilenstein: zwei Wege bewertet
+## Teil 7 — Gegenüberstellung `@pnp/sp` (Block 7, ~45 min)
 
-Dieselben vier Operationen mit `@pnp/sp`. Wichtig für die eingefrorene Plattform:
-es muss die **Version 1** sein (`@pnp/sp@1.3.11`), passend zu SPFx 1.4.1 / TS 3.6.
-Modernes pnp v3/v4 braucht neueres TypeScript und Node und läuft hier **nicht**.
+Den Datenzugriff, den wir uns gerade Schritt für Schritt von Hand erarbeitet haben,
+gibt es auch in deutlich kürzerer Form. In diesem Teil schreiben wir dieselben vier
+Operationen ein zweites Mal — diesmal mit der Bibliothek `@pnp/sp` — und stellen
+beide Wege nebeneinander, um abschließend zu beurteilen, wann sich welcher lohnt.
+
+Ein Hinweis vorweg, der auf unserer eingefrorenen Plattform entscheidend ist: Wir
+brauchen zwingend die **Version 1** (`@pnp/sp@1.3.11`), passend zu SPFx 1.4.1 und
+TypeScript 3.6. Das moderne `@pnp/sp` v3/v4 setzt neueres TypeScript und Node voraus
+und läuft hier **nicht**.
 
 ```pwsh
 npm install @pnp/sp@1.3.11
@@ -640,9 +691,10 @@ await sp.web.lists.getById(this.properties.listId).items.getById(id).delete();
 
 ## Teil 8 — Rückblick: Wie größere SPFx-Apps das strukturieren (Block 8, ~30 min)
 
-Das fertige Web Part hält Datenzugriff, Anzeige und Konfiguration in einer Klasse.
-Für ein kleines Web Part ist das genau richtig. Wächst eine Anwendung, werden diese
-Aufgaben üblicherweise in eigene Schichten getrennt:
+Zum Abschluss treten wir einen Schritt zurück. Unser Web Part hält alles in einer
+einzigen Klasse — Datenzugriff, Anzeige und Konfiguration. Für ein kleines Web Part
+ist das genau richtig. Wächst eine Anwendung jedoch, werden diese Aufgaben
+üblicherweise in eigene Schichten getrennt:
 
 | Hier (klein) | In größeren Apps | Aufgabe |
 |---|---|---|
