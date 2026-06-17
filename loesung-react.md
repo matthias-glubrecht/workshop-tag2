@@ -9,8 +9,8 @@
 
 1. `yo @microsoft/sharepoint` → Solution `listenpflege`, Web-Part `ListEditor`,
    Framework **React**.
-2. Property Controls installieren und in `config/config.json` registrieren
-   (siehe [loesung-vanilla.md](loesung-vanilla.md), Schritt 2).
+2. Property Controls installieren (siehe [loesung-vanilla.md](loesung-vanilla.md),
+   Schritt 2 — die `PropertyControlStrings` registriert `npm install` automatisch).
 3. Die drei Dateien unten anlegen/ersetzen.
 4. `gulp serve --nobrowser`, in der **SharePoint-Workbench** öffnen, Liste auswählen.
 
@@ -57,6 +57,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
     ReactDom.unmountComponentAtNode(this.domElement);
   }
 
+  // @ts-ignore
   protected get dataVersion(): Version {
     return Version.parse('1.0');
   }
@@ -125,13 +126,14 @@ interface IListEditorState {
   neuTitel: string;
   loading: boolean;
   error: string;
+  listName: string;
 }
 
 export default class ListEditor extends React.Component<IListEditorProps, IListEditorState> {
 
   constructor(props: IListEditorProps) {
     super(props);
-    this.state = { items: [], neuTitel: '', loading: false, error: '' };
+    this.state = { items: [], neuTitel: '', loading: false, error: '', listName: '' };
     this._onTitelChange = this._onTitelChange.bind(this);
     this._onAdd = this._onAdd.bind(this);
   }
@@ -153,9 +155,10 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
 
   private _load(listId?: string): void {
     const liste: string = listId || this.props.listId;
-    if (!liste) { this.setState({ items: [], loading: false, error: '' }); return; }
+    if (!liste) { this.setState({ items: [], loading: false, error: '', listName: '' }); return; }
 
     this.setState({ loading: true, error: '' });
+    this._ladeListenName(liste);
     const url: string = this._base(liste) + "/items?$select=Id,Title&$top=50";
 
     this.props.spHttpClient.get(url, SPHttpClient.configurations.v1)
@@ -169,6 +172,14 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
       .catch((f: Error): void => {
         this.setState({ items: [], loading: false, error: f.message });
       });
+  }
+
+  private _ladeListenName(listId?: string): void {
+    const url: string = this._base(listId || this.props.listId) + "?$select=Title";
+    this.props.spHttpClient.get(url, SPHttpClient.configurations.v1)
+      .then((antwort: SPHttpClientResponse): Promise<{ Title: string }> => antwort.json())
+      .then((daten: { Title: string }): void => { this.setState({ listName: daten.Title }); })
+      .catch((): void => { return; });
   }
 
   private _onTitelChange(e: React.FormEvent<HTMLInputElement>): void {
@@ -239,7 +250,7 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
 
     return (
       <div style={{ padding: 16, fontFamily: 'Segoe UI, sans-serif' }}>
-        <h2>Listenpflege</h2>
+        <h2>Listenpflege: {this.state.listName}</h2>
 
         <div style={{ margin: '8px 0' }}>
           <input

@@ -9,15 +9,11 @@
 
 1. `yo @microsoft/sharepoint` → Solution `listenpflege`, Web-Part `ListEditor`,
    Framework **No JavaScript framework** (Antworten siehe [handout.md](handout.md), Teil 1).
-2. Property Controls installieren und in `config/config.json` registrieren:
+2. Property Controls **im Projektverzeichnis** installieren (dort, wo `package.json`
+   liegt) — `npm install` ergänzt die `PropertyControlStrings` unter
+   `localizedResources` in `config/config.json` automatisch:
    ```pwsh
    npm install @pnp/spfx-property-controls@1.20.0
-   ```
-   ```json
-   "localizedResources": {
-     "ListEditorWebPartStrings": "lib/webparts/listEditor/loc/{locale}.js",
-     "PropertyControlStrings": "node_modules/@pnp/spfx-property-controls/lib/loc/{locale}.js"
-   }
    ```
 3. Die Dateien unten in `src/webparts/listEditor/` ersetzen bzw. anlegen.
 4. Im generierten `ListEditorWebPart.ts` den vom Generator erzeugten Import der
@@ -67,7 +63,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
 
     this.domElement.innerHTML =
       '<div style="padding:16px; font-family:Segoe UI, sans-serif;">'
-      + '<h2>Listenpflege</h2>'
+      + '<h2>Listenpflege: <span id="listenTitel"></span></h2>'
       + '<div style="margin:8px 0;">'
       + '<input id="neuTitel" type="text" placeholder="Neuer Titel" />'
       + ' <button id="hinzufuegen">Hinzufügen</button>'
@@ -76,9 +72,11 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
       + '</div>';
 
     this._verdrahten();
+    this._ladeListenName();
     this._ladeListe();
   }
 
+  // @ts-ignore
   protected get dataVersion(): Version {
     return Version.parse('1.0');
   }
@@ -130,7 +128,11 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   }
 
   private _ladeListe(): void {
-    const status: Element = this.domElement.querySelector('#status');
+    const status: Element | null = this.domElement.querySelector('#status');
+    if (status === null) {
+      window.alert('Kein Element mit ID "status" vorhanden. Es ist alles sinnlos.');
+      return;
+    }
     const url: string = this._baseUrl() + '/items?$select=Id,Title&$top=50';
 
     this.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
@@ -160,6 +162,21 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
         this._verdrahteZeilen();
       })
       .catch((f: Error): void => this._zeigeFehler(f));
+  }
+
+  private _ladeListenName(): void {
+    const titel: Element | null = this.domElement.querySelector('#listenTitel');
+    if (titel === null) { return; }
+
+    this.context.spHttpClient.get(this._baseUrl() + '?$select=Title', SPHttpClient.configurations.v1)
+      .then((antwort: SPHttpClientResponse): Promise<{ Title: string }> => {
+        if (!antwort.ok) { throw new Error('HTTP ' + antwort.status); }
+        return antwort.json();
+      })
+      .then((daten: { Title: string }): void => {
+        titel.innerHTML = escape(daten.Title);
+      })
+      .catch((f: Error): void => { titel.innerHTML = escape(f.message); });
   }
 
   private _verdrahteZeilen(): void {
@@ -325,10 +342,10 @@ define([], function() {
 
 | Symptom | Ursache / Fix |
 |---|---|
-| Listen-Picker erscheint nicht / Fehler zu `PropertyControlStrings` | `config/config.json` → `localizedResources` um `PropertyControlStrings` ergänzen, dann `gulp serve` neu starten. |
+| Listen-Picker erscheint nicht / Fehler zu `PropertyControlStrings` | Eintrag wird normalerweise von `npm install` automatisch in `config/config.json` (`localizedResources`) gesetzt. Fehlt er doch, ergänzen und `gulp serve` neu starten. |
 | `Cannot find module 'ListEditorWebPartStrings'` | `loc/mystrings.d.ts` fehlt oder Modulname weicht von `config.json` ab. Generator-Default passt. |
 | Schreiben schlägt mit 403 fehl | Teilnehmer-Account braucht **Bearbeiten**-Rechte auf der Liste (Lesen reicht fürs Lesen, nicht fürs Schreiben). |
 | Anlegen schlägt mit „type" / Metadaten-Fehler fehl | `odata=nometadata` in **Accept** und **Content-type** gesetzt? Dann ist kein `__metadata.type` nötig. |
 | Tabelle aktualisiert sich nach Schreiben nicht | Nach `_anlegen`/`_bearbeiten`/`_loeschen` im `.then(...)` `_ladeListe()` aufrufen. |
 | Weiße Fläche, Konsole zeigt 403/CORS | In der `localhost`-Workbench gibt es keine echte Liste. SharePoint-gehostete Workbench nutzen. |
-| `tsc`-Fehler bei `?.` / `??` | TS 3.6 kennt das nicht. Nur `||` / `&&` / klassische `if`. |
+| `tsc`-Fehler bei `?.` / `??` | TS 2.4.2 kennt das nicht. Nur `||` / `&&` / klassische `if`. |

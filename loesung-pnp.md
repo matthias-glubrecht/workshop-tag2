@@ -9,7 +9,7 @@
 
 1. Basis wie in [loesung-vanilla.md](loesung-vanilla.md) (Scaffold, Property
    Controls, Manifest, `loc/`-Dateien sind **identisch**).
-2. `@pnp/sp` in **Version 1** installieren — passend zu SPFx 1.4.1 / TS 3.6:
+2. `@pnp/sp` in **Version 1** installieren — passend zu SPFx 1.4.1 / TS 2.4.2:
    ```pwsh
    npm install @pnp/sp@1.3.11
    ```
@@ -64,7 +64,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
 
     this.domElement.innerHTML =
       '<div style="padding:16px; font-family:Segoe UI, sans-serif;">'
-      + '<h2>Listenpflege</h2>'
+      + '<h2>Listenpflege: <span id="listenTitel"></span></h2>'
       + '<div style="margin:8px 0;">'
       + '<input id="neuTitel" type="text" placeholder="Neuer Titel" />'
       + ' <button id="hinzufuegen">Hinzufügen</button>'
@@ -73,6 +73,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
       + '</div>';
 
     this._verdrahten();
+    this._ladeListenName();
     this._ladeListe();
   }
 
@@ -91,7 +92,11 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   // ----- Datenzugriff über @pnp/sp -----
 
   private _ladeListe(): void {
-    const status: Element = this.domElement.querySelector('#status');
+    const status: Element | null = this.domElement.querySelector('#status');
+    if (status === null) {
+      window.alert('Kein Element mit ID "status" vorhanden. Es ist alles sinnlos.');
+      return;
+    }
     sp.web.lists.getById(this.properties.listId)
       .items.select('Id', 'Title').top(50).get()
       .then((items: IListItem[]): void => {
@@ -113,6 +118,16 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
         this._verdrahteZeilen();
       })
       .catch((f: Error): void => this._zeigeFehler(f));
+  }
+
+  private _ladeListenName(): void {
+    const titel: Element | null = this.domElement.querySelector('#listenTitel');
+    if (titel === null) { return; }
+    sp.web.lists.getById(this.properties.listId).select('Title').get()
+      .then((liste: { Title: string }): void => {
+        titel.innerHTML = escape(liste.Title);
+      })
+      .catch((f: Error): void => { titel.innerHTML = escape(f.message); });
   }
 
   private _anlegen(titel: string): Promise<void> {
@@ -167,6 +182,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
     if (status) { status.innerHTML = 'Fehler: ' + escape(fehler.message); }
   }
 
+  // @ts-ignore
   protected get dataVersion(): Version {
     return Version.parse('1.0');
   }

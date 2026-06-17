@@ -255,6 +255,20 @@ Speichern → `gulp serve` rebuildet automatisch → Browser hart neu laden
 > Das ist die Arbeitsschleife für den ganzen Tag (und für jedes echte Projekt):
 > **ändern → speichern → hart neu laden → prüfen.**
 
+> **Roter Schlängel unter `dataVersion`?** Im generierten `ListEditorWebPart.ts`
+> unterringelt der Editor die Zeile `protected get dataVersion(): Version` — ein
+> bekannter Typkonflikt in den eingefrorenen Typdefinitionen von SPFx 1.4.1. Der
+> Build (`gulp serve`) übersetzt trotzdem fehlerfrei; es ist nur eine Editor-Anzeige,
+> kein echter Fehler. Wen der rote Schlängel stört, stellt eine Zeile `// @ts-ignore`
+> direkt darüber:
+
+```typescript
+// @ts-ignore
+protected get dataVersion(): Version {
+  return Version.parse('1.0');
+}
+```
+
 ---
 
 ## Teil 3 — Property Pane: Listenname als Textfeld (Block 3, ~30 min)
@@ -310,13 +324,15 @@ public render(): void {
   this.domElement.innerHTML = `
     <div style="padding:16px;">
       <h2>Listenpflege: ${escape(this.properties.listName)}</h2>
-      <div id='status'>Lade Daten...</div>
     </div>`;
 }
 ```
 
 Hart neu laden → rechts im Property-Bereich tippen → der Wert erscheint **live**.
 Konfiguration kommt also als `this.properties.xxx` in `render()` an.
+
+> Noch **kein** `<div id="status">` an dieser Stelle — das brauchen wir erst in 4b),
+> wenn die Liste gelesen wird. Hier zeigen wir nur den konfigurierten Namen.
 
 > **Sicherheitshinweis**: Benutzereingaben (wie `listName`) nie roh in `innerHTML`
 > schreiben — immer `escape()`. Sonst XSS. React nimmt einem das später ab.
@@ -438,7 +454,7 @@ Einträgen.
 
 ### Stolperfallen
 
-- **TS 3.6 / target es5**: kein `??`, kein `?.`. Nur `||`, `&&`, klassische `if`.
+- **TS 2.4.2 / target es5**: kein `??`, kein `?.`. Nur `||`, `&&`, klassische `if`.
 - **`escape()`** bei jedem Wert, der in `innerHTML` geht.
 - **403 / CORS** in der `localhost`-Workbench ist normal — echte Daten nur in der
   SharePoint-gehosteten Workbench.
@@ -454,18 +470,27 @@ ein Auswahlfeld, das uns alle Listen der Site zur Auswahl anbietet.
 Praktischerweise müssen wir dieses Steuerelement nicht selbst bauen — es steckt
 fertig in den **SPFx Property Controls** und heißt dort `PropertyFieldListPicker`.
 
+Dieser Wechsel ist mehr als eine Umbenennung. Weil der Picker nicht den Namen,
+sondern die **Listen-Id (GUID)** liefert, müssen wir an mehreren Stellen nachziehen:
+die Property (5b), die Property Pane (5c), die Lese-URL samt Hinweistext (5d) und
+schließlich die Anzeige des Namens (5e). Einfach überall `listName` durch `listId`
+zu ersetzen genügt nämlich nicht — die nackte GUID will niemand in der Überschrift
+sehen.
+
 ### 5a) Paket installieren
+
+Den Befehl **im Projektverzeichnis** ausführen — also dort, wo die `package.json`
+liegt (der Ordner, den `yo` angelegt hat). Wer ihn versehentlich woanders aufruft,
+installiert das Paket in den falschen Ordner und kann es im Projekt nicht
+referenzieren.
 
 ```pwsh
 npm install @pnp/spfx-property-controls@1.20.0
 ```
 
-In `config/config.json` die mitgelieferten Texte registrieren (unter
-`localizedResources`):
-
-```json
-"PropertyControlStrings": "node_modules/@pnp/spfx-property-controls/lib/loc/{locale}.js"
-```
+Die mitgelieferten Texte (`PropertyControlStrings`) muss man **nicht** von Hand in
+`config/config.json` eintragen — das `npm install` des Pakets ergänzt den Eintrag
+unter `localizedResources` automatisch.
 
 > `gulp serve` nach dem Installieren **einmal neu starten** — neue Pakete werden
 > sonst nicht gebündelt.
@@ -483,6 +508,12 @@ export interface IListEditorWebPartProps {
 
 ### 5c) Picker einbinden
 
+Der `PropertyFieldListPicker` **ersetzt** das `PropertyPaneTextField('listName', …)`
+aus 3b. In `getPropertyPaneConfiguration()` fliegt das alte Textfeld also raus, und
+an seine Stelle in `groupFields` tritt der Picker. Den Import von
+`PropertyPaneTextField` aus `@microsoft/sp-webpart-base` kannst Du entfernen, sobald
+kein Textfeld mehr übrig ist.
+
 ```typescript
 import {
   PropertyFieldListPicker,
@@ -490,8 +521,11 @@ import {
 } from '@pnp/spfx-property-controls/lib/PropertyFieldListPicker';
 ```
 
+`groupFields` enthält jetzt **statt** des Textfelds den Picker:
+
 ```typescript
 groupFields: [
+  // ersetzt: PropertyPaneTextField('listName', { label: 'Name der SharePoint-Liste' })
   PropertyFieldListPicker('listId', {
     label: 'Liste auswählen',
     selectedList: this.properties.listId,
@@ -507,9 +541,11 @@ groupFields: [
 ]
 ```
 
-### 5d) Lese-URL auf die Id umstellen
+### 5d) Lese-URL und Hinweistext auf die Id umstellen
 
-Statt `getbytitle('<name>')` jetzt die Id:
+Diese Änderung sitzt in `_ladeListe()` (aus 4b). Dort wird die bisherige
+`const url`-Zeile mit `getbytitle('<name>')` durch die Id-Variante über
+`lists(guid'…')` ersetzt:
 
 ```typescript
 const url: string = this.context.pageContext.web.absoluteUrl
@@ -517,8 +553,73 @@ const url: string = this.context.pageContext.web.absoluteUrl
   + "')/items?$select=Id,Title&$top=50";
 ```
 
+Im selben Schritt wandert die Prüfung am Anfang von `_ladeListe()` von `listName`
+auf `listId` — und ihr Text passt sich an: Wir tippen keinen Namen mehr ein, wir
+**wählen** eine Liste aus:
+
+```typescript
+if (!this.properties.listId) {
+  status.innerHTML = 'Bitte in der Property Pane eine Liste auswählen.';
+  return;
+}
+```
+
 Hart neu laden → rechts erscheint ein Dropdown mit allen Listen. Auswahl treffen →
 die Tabelle lädt. Kein Listenname mehr zu tippen.
+
+### 5e) Den Listennamen wieder anzeigen
+
+Ein Schönheitsfehler bleibt: Die Überschrift in `render()` zeigt mit
+`${escape(this.properties.listName)}` ins Leere — die Property heißt jetzt `listId`,
+und die nackte GUID will niemand lesen. Den **Klarnamen** der Liste wollen wir
+trotzdem weiter sehen. Den liefert uns die Liste selbst: Eine kleine Methode liest
+ihren `Title` über die Id und schreibt ihn in einen Platzhalter.
+
+```typescript
+private _ladeListenName(): void {
+  const titel: Element | null = this.domElement.querySelector('#listenTitel');
+  if (titel === null) { return; }
+
+  const url: string = this.context.pageContext.web.absoluteUrl
+    + "/_api/web/lists(guid'" + this.properties.listId + "')?$select=Title";
+
+  this.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
+    .then((antwort: SPHttpClientResponse): Promise<{ Title: string }> => {
+      if (!antwort.ok) { throw new Error('HTTP ' + antwort.status); }
+      return antwort.json();
+    })
+    .then((daten: { Title: string }): void => {
+      titel.innerHTML = escape(daten.Title);
+    })
+    .catch((fehler: Error): void => {
+      titel.innerHTML = escape(fehler.message);
+    });
+}
+```
+
+In `render()` bekommt die Überschrift einen leeren Platzhalter
+(`<span id="listenTitel">`), den die Methode füllt — und wir rufen sie zusätzlich zu
+`_ladeListe()` auf:
+
+```typescript
+public render(): void {
+  this.domElement.innerHTML = `
+    <div style="padding:16px; font-family:Segoe UI, sans-serif;">
+      <h2>Listenpflege: <span id="listenTitel"></span></h2>
+      <div id="status">Lade Daten ...</div>
+    </div>`;
+
+  this._ladeListenName();
+  this._ladeListe();
+}
+```
+
+Hart neu laden → die Überschrift trägt wieder den Klarnamen der Liste, während der
+Picker im Hintergrund mit der stabilen Id arbeitet. Genau darum ging es bei der
+Umstellung: **Id für die Technik, Name für die Anzeige.**
+
+> Das ist eine zweite, kleine REST-Anfrage allein für den Titel. Sie kostet kaum
+> etwas und hält Logik (Id) und Anzeige (Name) sauber getrennt.
 
 ---
 
@@ -678,16 +779,140 @@ private _loeschenGeprueft(id: number, etag: string): Promise<void> {
 }
 ```
 
-### 6d) Bedienelemente
+### 6d) Bedienelemente einbauen
 
-Ein Eingabefeld + „Hinzufügen"-Button über der Tabelle, pro Zeile ein
-„Bearbeiten"- und ein „Löschen"-Button. Nach jeder Schreiboperation `_ladeListe()`
-erneut aufrufen, damit die Tabelle den neuen Stand zeigt. Die vollständige
-Verdrahtung (Event-Handler an die per `innerHTML` erzeugten Buttons) steht in
-[loesung-vanilla.md](loesung-vanilla.md).
+Bisher **zeigt** die Tabelle nur an. Jetzt geben wir ihr die Bedienelemente, die die
+drei Schreiboperationen auslösen: ein Eingabefeld mit „Hinzufügen"-Button über der
+Tabelle und pro Zeile einen „Bearbeiten"- und einen „Löschen"-Button. Das geschieht
+in vier kleinen Schritten.
+
+**Schritt 1 — Eingabefeld und „Hinzufügen"-Button in `render()`.** Über die Tabelle
+kommt eine Zeile mit Textfeld und Button. Die Überschrift mit dem Listennamen aus
+5e und der `#status`-Container bleiben erhalten:
+
+```typescript
+public render(): void {
+  this.domElement.innerHTML = `
+    <div style="padding:16px; font-family:Segoe UI, sans-serif;">
+      <h2>Listenpflege: <span id="listenTitel"></span></h2>
+      <div style="margin:8px 0;">
+        <input id="neuTitel" type="text" placeholder="Neuer Titel" />
+        <button id="hinzufuegen">Hinzufügen</button>
+      </div>
+      <div id="status">Lade Daten ...</div>
+    </div>`;
+
+  this._verdrahten();
+  this._ladeListenName();
+  this._ladeListe();
+}
+```
+
+`render()` baut nur das HTML. Die Buttons sind im Moment ihrer Erzeugung bloß Text
+im `innerHTML` — ihre Klick-Handler hängen wir **danach** an, in `_verdrahten()`.
+
+**Schritt 2 — den „Hinzufügen"-Button verdrahten.** `_verdrahten()` sucht den Button
+und hängt einen Klick-Handler an, der `_anlegen(...)` aus 6a aufruft, danach das
+Feld leert und neu lädt:
+
+```typescript
+private _verdrahten(): void {
+  const add: Element | null = this.domElement.querySelector('#hinzufuegen');
+  if (add === null) { return; }
+  add.addEventListener('click', (): void => {
+    const feld: HTMLInputElement =
+      this.domElement.querySelector('#neuTitel') as HTMLInputElement;
+    const titel: string = feld.value.trim();
+    if (titel.length === 0) { return; }
+    this._anlegen(titel)
+      .then((): void => { feld.value = ''; this._ladeListe(); })
+      .catch((fehler: Error): void => this._zeigeFehler(fehler));
+  });
+}
+```
+
+**Schritt 3 — pro Zeile zwei Buttons rendern.** In `_ladeListe()` bekommt jede
+Tabellenzeile eine dritte Zelle mit „Bearbeiten" und „Löschen". Die Item-`Id` (und
+für „Bearbeiten" der aktuelle Titel) reisen als `data-…`-Attribute mit — von dort
+holen die Handler sie gleich wieder ab. Die Zeilen-Schleife aus 4b wächst dafür,
+und am Ende verdrahten wir die frisch erzeugten Buttons:
+
+```typescript
+let zeilen: string = '';
+for (let i: number = 0; i < daten.value.length; i++) {
+  const item: IListItem = daten.value[i];
+  zeilen = zeilen
+    + '<tr><td>' + item.Id + '</td>'
+    + '<td>' + escape(item.Title) + '</td>'
+    + '<td><button class="bearbeiten" data-id="' + item.Id
+    + '" data-titel="' + escape(item.Title) + '">Bearbeiten</button> '
+    + '<button class="loeschen" data-id="' + item.Id + '">Löschen</button></td></tr>';
+}
+status.innerHTML =
+  '<table border="1" cellpadding="6" style="border-collapse:collapse;">'
+  + '<thead><tr><th>Id</th><th>Titel</th><th></th></tr></thead>'
+  + '<tbody>' + zeilen + '</tbody></table>';
+this._verdrahteZeilen();
+```
+
+**Schritt 4 — die Zeilen-Buttons verdrahten.** `_verdrahteZeilen()` läuft über alle
+`.bearbeiten`- und `.loeschen`-Buttons und hängt die Handler an. „Bearbeiten" fragt
+per `window.prompt` einen neuen Titel ab, „Löschen" sichert per `window.confirm` ab
+— danach jeweils `_bearbeiten(...)` bzw. `_loeschen(...)` aus 6b/6c und neu laden:
+
+```typescript
+private _verdrahteZeilen(): void {
+  const bearbeiten: NodeListOf<Element> = this.domElement.querySelectorAll('.bearbeiten');
+  for (let i: number = 0; i < bearbeiten.length; i++) {
+    bearbeiten[i].addEventListener('click', (e: Event): void => {
+      const el: HTMLElement = e.currentTarget as HTMLElement;
+      const id: number = parseInt(el.getAttribute('data-id') || '', 10);
+      const alt: string = el.getAttribute('data-titel') || '';
+      const neu: string = window.prompt('Neuer Titel:', alt);
+      if (neu === null || neu.trim().length === 0) { return; }
+      this._bearbeiten(id, neu.trim())
+        .then((): void => this._ladeListe())
+        .catch((fehler: Error): void => this._zeigeFehler(fehler));
+    });
+  }
+
+  const loeschen: NodeListOf<Element> = this.domElement.querySelectorAll('.loeschen');
+  for (let i: number = 0; i < loeschen.length; i++) {
+    loeschen[i].addEventListener('click', (e: Event): void => {
+      const el: HTMLElement = e.currentTarget as HTMLElement;
+      const id: number = parseInt(el.getAttribute('data-id') || '', 10);
+      if (!window.confirm('Eintrag ' + id + ' wirklich löschen?')) { return; }
+      this._loeschen(id)
+        .then((): void => this._ladeListe())
+        .catch((fehler: Error): void => this._zeigeFehler(fehler));
+    });
+  }
+}
+```
+
+Die Handler greifen auf `_zeigeFehler(...)` zurück — ein Einzeiler, der die
+Fehlermeldung in den `#status`-Bereich schreibt:
+
+```typescript
+private _zeigeFehler(fehler: Error): void {
+  const status: Element | null = this.domElement.querySelector('#status');
+  if (status !== null) { status.innerHTML = 'Fehler: ' + escape(fehler.message); }
+}
+```
+
+Hart neu laden → über der Tabelle steht jetzt das Eingabefeld, jede Zeile trägt ihre
+zwei Buttons. Anlegen, Bearbeiten und Löschen funktionieren, und die Tabelle
+aktualisiert sich nach jeder Operation von selbst.
 
 > **Reihenfolge merken**: Schreiben → auf das Promise warten → neu laden. Sonst
 > zeigt die Tabelle noch den alten Stand.
+
+> **Warum erst rendern, dann verdrahten?** Mit `innerHTML` erzeugte Buttons sind
+> reiner Text, bis der Browser sie geparst hat — erst danach existieren sie als
+> Elemente, an die `addEventListener` etwas hängen kann. Die Zeilen-Buttons
+> entstehen bei **jedem** `_ladeListe()` neu, deshalb verdrahtet `_verdrahteZeilen()`
+> sie auch jedes Mal aufs Neue. In React entfällt dieser Schritt — dort beschreibt
+> man das UI deklarativ (siehe [loesung-react.md](loesung-react.md)).
 
 ---
 
@@ -700,7 +925,7 @@ beide Wege nebeneinander, um abschließend zu beurteilen, wann sich welcher lohn
 
 Ein Hinweis vorweg, der auf unserer eingefrorenen Plattform entscheidend ist: Wir
 brauchen zwingend die **Version 1** (`@pnp/sp@1.3.11`), passend zu SPFx 1.4.1 und
-TypeScript 3.6. Das moderne `@pnp/sp` v3/v4 setzt neueres TypeScript und Node voraus
+TypeScript 2.4.2. Das moderne `@pnp/sp` v3/v4 setzt neueres TypeScript und Node voraus
 und läuft hier **nicht**.
 
 ```pwsh
@@ -739,7 +964,7 @@ await sp.web.lists.getById(this.properties.listId)
 await sp.web.lists.getById(this.properties.listId).items.getById(id).delete();
 ```
 
-> `async/await` ist mit TS 3.6 / target es5 erlaubt — der Compiler erzeugt den
+> `async/await` ist mit TS 2.4.2 / target es5 erlaubt — der Compiler erzeugt den
 > passenden Promise-Code. Wer bei `.then()` bleiben will, kann das auch.
 
 ### Die direkte Gegenüberstellung

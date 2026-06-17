@@ -49,7 +49,7 @@ Diesen Satz am Anfang sagen und am Ende wieder aufgreifen.
 | 2 Serve | 30 | `gulp trust-dev-cert` vergessen → weiße/unsichere Seite. Schritt laut ansagen. |
 | 3 Property-Textfeld | 30 | `PropertyPaneTextField` aus `@microsoft/sp-webpart-base` (nicht `sp-property-pane`). |
 | 4 Lesen | 60 | `localhost`-Workbench hat keine Liste → SharePoint-gehostete Workbench. **Häufigster Stolperstein.** |
-| 5 Listen-Picker | 30 | `PropertyControlStrings` in `config.json` fehlt → Picker kommt nicht. `gulp serve` neu starten. |
+| 5 Listen-Picker | 30 | `npm install` setzt `PropertyControlStrings` in `config.json` automatisch. Picker fehlt trotzdem? Eintrag prüfen, `gulp serve` neu starten. |
 | 6 Schreiben | 75 | 403 beim Schreiben = fehlende **Bearbeiten**-Rechte. Metadaten-Fehler = `odata=nometadata` setzen. |
 | 7 `@pnp/sp` | 45 | Falsche pnp-Version → Compile-Fehler. **Nur `@pnp/sp@1.3.11`.** |
 | 8 Rückblick | 30 | Reiner Vortrag/Diskussion, kein Code. |
@@ -67,13 +67,14 @@ Diesen Satz am Anfang sagen und am Ende wieder aufgreifen.
 | `yo` bricht / Generator fehlt | `npm install -g gulp-cli@2.3.0 yo@3.1.1 @microsoft/generator-sharepoint@1.10.0` (mit `fnm use 8.17.0`). Generator 1.10 + Ziel „SharePoint 2019 onwards" erzeugt das SPFx-1.4.1-Projekt. |
 | `gulp serve` bricht mit node-gyp/Python | `node -v` ≠ `v8.17.0` → `fnm use 8.17.0`. |
 | Workbench weiß / „insecure" | `gulp trust-dev-cert` lief nicht, oder Chrome-Flag `chrome://flags/#allow-insecure-localhost`. Alternativ Edge. |
-| Listen-Picker erscheint nicht | `config.json` → `localizedResources` um `PropertyControlStrings` ergänzen, `gulp serve` neu starten. |
+| Listen-Picker erscheint nicht | `PropertyControlStrings` wird von `npm install` automatisch in `config.json` gesetzt; fehlt der Eintrag, ergänzen und `gulp serve` neu starten. |
 | Lesen: 404/400 | Liste in **dieser** Site vorhanden? Picker liefert die Id — URL `lists(guid'...')`. |
 | Schreiben: 403 | Teilnehmer-Account braucht **Bearbeiten**-Rechte, nicht nur Lesen. |
 | Anlegen: Metadaten-/„type"-Fehler | `odata=nometadata` in Accept **und** Content-type. |
 | Tabelle aktualisiert sich nach Schreiben nicht | Nach der Schreiboperation `_ladeListe()` / `this._load()` aufrufen. |
-| `@pnp/sp`-Compile-Fehler | Falsche Version installiert. Nur `@pnp/sp@1.3.11` (v1) passt zu SPFx 1.4.1 / TS 3.6. |
-| `?.` / `??` Compile-Fehler | TS 3.6 kennt das nicht. `||` / `&&` verwenden. |
+| `@pnp/sp`-Compile-Fehler | Falsche Version installiert. Nur `@pnp/sp@1.3.11` (v1) passt zu SPFx 1.4.1 / TS 2.4.2. |
+| `?.` / `??` Compile-Fehler | TS 2.4.2 kennt das nicht. `||` / `&&` verwenden. |
+| `dataVersion` rot unterringelt | Bekannter Typkonflikt in den SPFx-1.4.1-Typen; der Build läuft. `// @ts-ignore` direkt über `get dataVersion()` setzen. |
 | React: „valid element (or null) must be returned" | Ein `render()`-Pfad gibt `undefined` zurück. Jeder Zweig muss returnen (`null` ist erlaubt). |
 
 ---
