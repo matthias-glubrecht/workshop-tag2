@@ -407,8 +407,25 @@ private _ladeListe(): void {
 }
 ```
 
-`render()` legt den Container an und ruft `_ladeListe()` auf. Vollständige Datei:
-[loesung-vanilla.md](loesung-vanilla.md).
+Damit das funktioniert, muss `render()` zweierlei tun: den Container samt dem
+Element `#status` anlegen — genau das `<div>`, in das `_ladeListe()` oben per
+`querySelector('#status')` hineinschreibt — und danach `_ladeListe()` aufrufen:
+
+```typescript
+public render(): void {
+  this.domElement.innerHTML = `
+    <div style="padding:16px; font-family:Segoe UI, sans-serif;">
+      <h2>Listenpflege: ${escape(this.properties.listName)}</h2>
+      <div id="status">Lade Daten ...</div>
+    </div>`;
+
+  this._ladeListe();
+}
+```
+
+Ohne das `<div id="status">` liefe `querySelector('#status')` ins Leere (`null`),
+und der erste Zugriff `status.innerHTML = ...` bräche mit einem Fehler ab.
+Vollständige Datei: [loesung-vanilla.md](loesung-vanilla.md).
 
 Hart neu laden in der **SharePoint-Workbench** → die Tabelle füllt sich mit echten
 Einträgen.
