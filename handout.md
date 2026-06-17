@@ -310,6 +310,7 @@ public render(): void {
   this.domElement.innerHTML = `
     <div style="padding:16px;">
       <h2>Listenpflege: ${escape(this.properties.listName)}</h2>
+      <div id='status'>Lade Daten...</div>
     </div>`;
 }
 ```
@@ -375,11 +376,16 @@ Den ersten Lese-Versuch halten wir bewusst bei `Id,Title` — schlicht und robus
 
 ```typescript
 private _ladeListe(): void {
-  const status: Element = this.domElement.querySelector('#status');
-  if (!this.properties.listName) {
-    status.innerHTML = 'Bitte rechts einen Listennamen eintragen.';
-    return;
-  }
+  const status: Element | null = this.domElement.querySelector('#status');
+    if (status === null)
+    {
+      window.alert('Kein Element mit ID "status" vorhanden. Es ist alles sinnlos.');
+      return;
+    }
+    if (!this.properties.listName) {
+      status.innerHTML = 'Bitte in der Property Pane einen Listennamen eintragen. Sonst ist alle sinnlos.';
+      return;
+    }
 
   const url: string = this.context.pageContext.web.absoluteUrl
     + "/_api/web/lists/getbytitle('" + this.properties.listName
