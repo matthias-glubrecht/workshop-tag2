@@ -79,9 +79,42 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
     this._ladeListe();
   }
 
+  protected get dataVersion(): Version {
+    return Version.parse('1.0');
+  }
+
+  protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
+    return {
+      pages: [
+        {
+          header: { description: strings.PropertyPaneDescription },
+          groups: [
+            {
+              groupName: strings.BasicGroupName,
+              groupFields: [
+                PropertyFieldListPicker('listId', {
+                  label: strings.ListFieldLabel,
+                  selectedList: this.properties.listId,
+                  includeHidden: false,
+                  orderBy: PropertyFieldListPickerOrderBy.Title,
+                  disabled: false,
+                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
+                  properties: this.properties,
+                  context: this.context,
+                  deferredValidationTime: 0,
+                  key: 'listPickerFieldId'
+                })
+              ]
+            }
+          ]
+        }
+      ]
+    };
+  }
+
   private _baseUrl(): string {
     return this.context.pageContext.web.absoluteUrl
-      + "/_api/web/lists(guid'" + this.properties.listId + "')";
+      + `/_api/web/lists(guid'${this.properties.listId}')`;
   }
 
   private _verdrahten(): void {
@@ -98,7 +131,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
 
   private _ladeListe(): void {
     const status: Element = this.domElement.querySelector('#status');
-    const url: string = this._baseUrl() + "/items?$select=Id,Title&$top=50";
+    const url: string = this._baseUrl() + '/items?$select=Id,Title&$top=50';
 
     this.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
       .then((antwort: SPHttpClientResponse): Promise<{ value: IListItem[] }> => {
@@ -158,7 +191,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   }
 
   private _anlegen(titel: string): Promise<void> {
-    return this.context.spHttpClient.post(this._baseUrl() + "/items",
+    return this.context.spHttpClient.post(this._baseUrl() + `/items`,
       SPHttpClient.configurations.v1, {
         headers: {
           'Accept': 'application/json;odata=nometadata',
@@ -173,7 +206,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   }
 
   private _bearbeiten(id: number, titel: string): Promise<void> {
-    return this.context.spHttpClient.post(this._baseUrl() + "/items(" + id + ")",
+    return this.context.spHttpClient.post(this._baseUrl() + `/items(${id})`,
       SPHttpClient.configurations.v1, {
         headers: {
           'Accept': 'application/json;odata=nometadata',
@@ -190,7 +223,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   }
 
   private _loeschen(id: number): Promise<void> {
-    return this.context.spHttpClient.post(this._baseUrl() + "/items(" + id + ")",
+    return this.context.spHttpClient.post(this._baseUrl() + `/items(${id})`,
       SPHttpClient.configurations.v1, {
         headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
       })
@@ -202,39 +235,6 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   private _zeigeFehler(fehler: Error): void {
     const status: Element = this.domElement.querySelector('#status');
     if (status) { status.innerHTML = 'Fehler: ' + escape(fehler.message); }
-  }
-
-  protected get dataVersion(): Version {
-    return Version.parse('1.0');
-  }
-
-  protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
-    return {
-      pages: [
-        {
-          header: { description: strings.PropertyPaneDescription },
-          groups: [
-            {
-              groupName: strings.BasicGroupName,
-              groupFields: [
-                PropertyFieldListPicker('listId', {
-                  label: strings.ListFieldLabel,
-                  selectedList: this.properties.listId,
-                  includeHidden: false,
-                  orderBy: PropertyFieldListPickerOrderBy.Title,
-                  disabled: false,
-                  onPropertyChange: this.onPropertyPaneFieldChanged.bind(this),
-                  properties: this.properties,
-                  context: this.context,
-                  deferredValidationTime: 0,
-                  key: 'listPickerFieldId'
-                })
-              ]
-            }
-          ]
-        }
-      ]
-    };
   }
 }
 ```

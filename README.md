@@ -95,16 +95,22 @@ workshop-tag2/
 | Werkzeug | Wofür | Prüfen mit |
 |---|---|---|
 | **fnm + Node 8.17.0** | SPFx-1.4.1-Zwang | `node -v` → `v8.17.0` |
-| **Yeoman + SP-Generator 1.4.1** | Projekt scaffolden | `yo --version` |
-| **gulp 3** | Build/Serve | `gulp -v` |
+| **Yeoman + SP-Generator 1.10.0** | Projekt scaffolden (erzeugt mit Ziel „SharePoint 2019 onwards" ein SPFx-1.4.1-Projekt) | `yo --version` → `3.1.1` |
+| **gulp-cli 2.3.0** | Build/Serve | `gulp -v` |
 | **Chrome/Edge** | Workbench | — |
 
 Globale Pakete (falls auf einem Laptop noch nicht vorhanden):
 
 ```pwsh
 fnm use 8.17.0
-npm install -g yo gulp@3 @microsoft/generator-sharepoint@1.4.1
+npm install -g gulp-cli@2.3.0 yo@3.1.1 @microsoft/generator-sharepoint@1.10.0
 ```
+
+> **Generator 1.10, nicht 1.4.1**: Die Generator-Version legt nicht die
+> SPFx-Version fest — das tut die Baseline-Auswahl im Dialog. 1.10.0 ist die letzte
+> Generator-Version, die auf Node 8 läuft und beim Ziel „SharePoint 2019 onwards"
+> ein SPFx-**1.4.1**-Projekt erzeugt. Details in [handout.md](handout.md),
+> Abschnitt **Voraussetzungen**.
 
 > **Wichtig**: Das neue Projekt wird in einem **eigenen, kurzen Pfad** angelegt
 > (z. B. `C:\repos\listenpflege`), NICHT in OneDrive.

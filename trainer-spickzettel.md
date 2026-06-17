@@ -64,7 +64,7 @@ Diesen Satz am Anfang sagen und am Ende wieder aufgreifen.
 
 | Problem | Erste Hilfe |
 |---|---|
-| `yo` bricht / Generator fehlt | `npm install -g yo @microsoft/generator-sharepoint@1.4.1` (mit `fnm use 8.17.0`). |
+| `yo` bricht / Generator fehlt | `npm install -g gulp-cli@2.3.0 yo@3.1.1 @microsoft/generator-sharepoint@1.10.0` (mit `fnm use 8.17.0`). Generator 1.10 + Ziel „SharePoint 2019 onwards" erzeugt das SPFx-1.4.1-Projekt. |
 | `gulp serve` bricht mit node-gyp/Python | `node -v` ≠ `v8.17.0` → `fnm use 8.17.0`. |
 | Workbench weiß / „insecure" | `gulp trust-dev-cert` lief nicht, oder Chrome-Flag `chrome://flags/#allow-insecure-localhost`. Alternativ Edge. |
 | Listen-Picker erscheint nicht | `config.json` → `localizedResources` um `PropertyControlStrings` ergänzen, `gulp serve` neu starten. |
@@ -87,7 +87,7 @@ Diesen Satz am Anfang sagen und am Ende wieder aufgreifen.
 - [ ] **Bearbeiten-Rechte** für die Teilnehmer-Accounts auf der Liste setzen —
       sonst scheitern Block 6/7 mit 403.
 - [ ] SharePoint-Workbench-URL bereithalten:
-      `https://<server>/sites/<site>/_layouts/15/workbench.aspx`
+      `http://<server>/sites/<site>/_layouts/15/workbench.aspx`
 - [ ] Auf der Trainer-Maschine das Web Part einmal komplett durchbauen
       (`SPHttpClient` **und** `@pnp/sp`), Timings notieren.
 - [ ] Ein **fertig gescaffoldetes `listenpflege`-Projekt** als Fallback bereit

@@ -21,6 +21,57 @@ deutschen Begriff und dem Code-Bezeichner hin- und herübersetzen.
 
 ---
 
+## Voraussetzungen (einmalig pro Rechner einrichten)
+
+Bevor es losgeht, muss die Werkzeugkette stimmen. SPFx 1.4.1 ist eine
+**eingefrorene Plattform** — die Versionen unten sind nicht beliebig austauschbar,
+sondern aufeinander abgestimmt. SPFx 1.4.1 läuft nur auf **Node 8**, und der
+Yeoman-Generator muss eine Version sein, die *sowohl* auf Node 8 läuft *als auch*
+noch 1.4.1-Projekte erzeugen kann.
+
+| Werkzeug | Version | Zweck / Hinweis |
+|---|---|---|
+| **Node.js** | **8.17.0** (LTS v8 „Carbon") | SPFx 1.4.1 unterstützt nur Node 6/8. Neuere Node-Versionen brechen den Build (gulp 3, node-sass). |
+| **fnm** (oder nvm-windows) | aktuell | Node-Versionsmanager — schaltet pro Projekt auf 8.17.0, ohne das System-Node zu stören. |
+| **Visual Studio Code** | aktuell | Empfohlener Editor (jeder Editor mit TypeScript-Unterstützung geht). |
+| **gulp-cli** (global) | **2.3.0** | Nur die *CLI* global — **nicht** `gulp` selbst. Das Projekt bringt gulp 3.9.1 lokal mit. |
+| **Yeoman** (`yo`, global) | **3.1.1** | Läuft mit Generator 1.10 auf Node 8. |
+| **@microsoft/generator-sharepoint** (global) | **1.10.0** | Erzeugt das Projektgerüst. Siehe Kasten unten — die Version ist bewusst gewählt. |
+| Moderner Browser | Edge / Chrome / Firefox | Für die Workbench. |
+
+Alles in einer Zeile (vorher mit `fnm use 8.17.0` auf Node 8.17.0 schalten):
+
+```pwsh
+npm install -g gulp-cli@2.3.0 yo@3.1.1 @microsoft/generator-sharepoint@1.10.0
+```
+
+Kurz prüfen, dass alles passt:
+
+```pwsh
+node -v               # v8.17.0
+gulp -v               # CLI version: 2.3.0
+yo --version          # 3.1.1
+npm ls -g --depth=0   # @microsoft/generator-sharepoint@1.10.0
+```
+
+> **Warum Generator 1.10 und nicht 1.4.1?** Die Version des *Generators* legt nicht
+> die SPFx-Version des *erzeugten Projekts* fest — das tut die Baseline-Auswahl im
+> Generator-Dialog (Teil 1). Generator **1.10.0** ist die **letzte** Version, die
+> noch auf Node 8 läuft (ab 1.13 erzeugt der Generator nur noch Projekte für
+> SharePoint Online) und die beim Ziel „SharePoint 2019 onwards" ein
+> **SPFx-1.4.1-Projekt** erzeugt (`@microsoft/sp-*` in `~1.4.0`, `config.json` v2.0).
+> Generator 1.4.1 kennt das Ziel „2019" noch gar nicht; seine einzige
+> on-premises-Option erzeugt das ältere SPFx **1.1.0**. Diese Empfehlung deckt sich
+> mit Andrew Connells „Definitive guide … SharePoint Server 2019" und der
+> Microsoft-Doku „SharePoint Framework development with SharePoint Server 2019 and
+> Subscription Edition".
+
+Das selbstsignierte Entwicklungs-Zertifikat wird einmalig pro Rechner per
+`gulp trust-dev-cert` vertraut — das passiert im Projektordner und ist in Teil 2
+beschrieben.
+
+---
+
 ## Infrastruktur — Zugriff auf den Test-SharePoint
 
 Bevor wir mit dem Bauen beginnen, stellen wir sicher, dass unser Rechner den
@@ -64,9 +115,14 @@ Danach ist der Server im Browser erreichbar — die Workshop-Site und die
 SharePoint-Workbench liegen unter diesem Host:
 
 ```
-https://sharepoint.pangaea.local/sites/<workshop-site>/_layouts/15/workbench.aspx
+http://sharepoint.pangaea.local/sites/<workshop-site>/_layouts/15/workbench.aspx
 ```
 
+> Dieser Server läuft **nur über HTTP** (kein HTTPS) — also `http://` verwenden,
+> ein `https://` läuft hier in einen Timeout. (Die **lokale** Workbench unter
+> `https://localhost:4321` ist davon unberührt — der SPFx-Dev-Server nutzt dort
+> immer HTTPS.)
+>
 > Überall im weiteren Verlauf, wo `<server>` steht (z. B. in Teil 4 und Teil 5),
 > ist `sharepoint.pangaea.local` gemeint.
 
@@ -86,11 +142,10 @@ mkdir C:\repos\listenpflege
 cd C:\repos\listenpflege
 ```
 
-Falls `yo` / Generator fehlen:
-
-```pwsh
-npm install -g yo gulp@3 @microsoft/generator-sharepoint@1.4.1
-```
+> Die globalen Werkzeuge (`gulp-cli@2.3.0`, `yo@3.1.1`,
+> `@microsoft/generator-sharepoint@1.10.0`) sind oben unter **Voraussetzungen**
+> beschrieben — falls noch nicht installiert, dort die Ein-Zeilen-Installation
+> ausführen.
 
 ---
 
@@ -110,7 +165,7 @@ und beantworten seine Fragen wie folgt:
 | Frage | Antwort |
 |---|---|
 | What is your solution name? | `listenpflege` |
-| Which baseline packages? | **SharePoint 2016 onwards including 2019 and SharePoint Online** *(die on-premises-taugliche Wahl — NICHT „SharePoint Online only")* |
+| Which baseline packages? | **SharePoint 2019 onwards, including SharePoint Online** *(erzeugt mit Generator 1.10 ein SPFx-1.4.1-Projekt. NICHT „SharePoint 2016 onwards…" wählen — das gäbe SPFx 1.1.0 — und NICHT „SharePoint Online only")* |
 | Where to place the files? | **Use the current folder** |
 | Deploy to all sites? | `N` |
 | Permissions / CDN-Frage | Enter (Default) |
@@ -277,7 +332,7 @@ REST-Schnittstelle von SharePoint aus.
 ### 4a) Test-Liste anlegen (einmalig)
 
 Wir beginnen mit der Datenquelle. In der echten Site (nicht der lokalen Workbench,
-z. B. `https://<server>/sites/dev`) legen wir eine Liste **Aufgaben** an (Typ
+z. B. `http://<server>/sites/dev`) legen wir eine Liste **Aufgaben** an (Typ
 „Liste").
 
 Damit die Tabelle später beim Bonus etwas hergibt, lohnen sich Spalten mit
@@ -299,7 +354,7 @@ verschiedenen Typen — alle kommen direkt per REST zurück:
 5–8 Einträge mit gemischten Werten anlegen.
 
 > Zum echten Datenlesen brauchst Du die **SharePoint-gehostete** Workbench:
-> `https://<server>/sites/dev/_layouts/15/workbench.aspx`.
+> `http://<server>/sites/dev/_layouts/15/workbench.aspx`.
 > Die `localhost`-Workbench hat keine echte Liste im Hintergrund.
 
 ### 4b) Lesen mit `SPHttpClient`
