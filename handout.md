@@ -650,8 +650,7 @@ private _anlegen(titel: string): Promise<void> {
   return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
     headers: {
       'Accept': 'application/json;odata=nometadata',
-      'Content-type': 'application/json;odata=nometadata',
-      'odata-version': ''
+      'Content-type': 'application/json;odata=nometadata'
     },
     body: JSON.stringify({ Title: titel })
   }).then((antwort: SPHttpClientResponse): void => {
@@ -663,6 +662,14 @@ private _anlegen(titel: string): Promise<void> {
 > **`odata=nometadata`** erspart das Mitschicken des Entity-Typs
 > (`__metadata: { type: 'SP.Data.AufgabenListItem' }`). Mit Verbose-Metadaten
 > müsste man diesen exakten Namen kennen — eine klassische Stolperfalle.
+
+> **Keinen `odata-version`-Header setzen.** `SPHttpClient.configurations.v1`
+> aktiviert `jsonRequest`; der Client validiert dann den `OData-Version`-Header und
+> lässt nur `3.0` oder `4.0` zu. Der früher verbreitete Trick `'odata-version': ''`
+> (leerer String) bricht den Aufruf deshalb schon **vor dem Senden** ab:
+> *„ISPHttpClientConfiguration.jsonRequest is enabled, which requires the
+> OData-Version header to be 3.0 or 4.0"*. Lösung: den Header einfach weglassen —
+> der `SPHttpClient` setzt selbst einen gültigen Wert.
 
 ### 6b) Bearbeiten (MERGE)
 
@@ -678,7 +685,6 @@ private _bearbeiten(id: number, titel: string): Promise<void> {
     headers: {
       'Accept': 'application/json;odata=nometadata',
       'Content-type': 'application/json;odata=nometadata',
-      'odata-version': '',
       'IF-MATCH': '*',
       'X-HTTP-Method': 'MERGE'
     },
@@ -717,7 +723,6 @@ private _bearbeitenGeprueft(id: number, titel: string, etag: string): Promise<vo
     headers: {
       'Accept': 'application/json;odata=nometadata',
       'Content-type': 'application/json;odata=nometadata',
-      'odata-version': '',
       'IF-MATCH': etag,            // das gemerkte ETag statt '*'
       'X-HTTP-Method': 'MERGE'
     },
@@ -748,7 +753,7 @@ private _loeschen(id: number): Promise<void> {
     + "/_api/web/lists(guid'" + this.properties.listId + "')/items(" + id + ")";
 
   return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
-    headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
+    headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' }
   }).then((antwort: SPHttpClientResponse): void => {
     if (!antwort.ok) { throw new Error('Löschen fehlgeschlagen: ' + antwort.status); }
   });
@@ -768,7 +773,7 @@ private _loeschenGeprueft(id: number, etag: string): Promise<void> {
     + "/_api/web/lists(guid'" + this.properties.listId + "')/items(" + id + ")";
 
   return this.context.spHttpClient.post(url, SPHttpClient.configurations.v1, {
-    headers: { 'IF-MATCH': etag, 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
+    headers: { 'IF-MATCH': etag, 'X-HTTP-Method': 'DELETE' }
   }).then((antwort: SPHttpClientResponse): void => {
     if (antwort.status === 412) {
       throw new Error('Der Eintrag wurde zwischenzeitlich geändert. Bitte prüfen, '

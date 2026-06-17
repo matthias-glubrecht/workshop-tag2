@@ -194,8 +194,7 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
       SPHttpClient.configurations.v1, {
         headers: {
           'Accept': 'application/json;odata=nometadata',
-          'Content-type': 'application/json;odata=nometadata',
-          'odata-version': ''
+          'Content-type': 'application/json;odata=nometadata'
         },
         body: JSON.stringify({ Title: titel })
       })
@@ -216,7 +215,6 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
         headers: {
           'Accept': 'application/json;odata=nometadata',
           'Content-type': 'application/json;odata=nometadata',
-          'odata-version': '',
           'IF-MATCH': '*',
           'X-HTTP-Method': 'MERGE'
         },
@@ -234,7 +232,7 @@ export default class ListEditor extends React.Component<IListEditorProps, IListE
 
     this.props.spHttpClient.post(this._base() + "/items(" + item.Id + ")",
       SPHttpClient.configurations.v1, {
-        headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
+        headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' }
       })
       .then((antwort: SPHttpClientResponse): void => {
         if (!antwort.ok) { throw new Error('Löschen: ' + antwort.status); }

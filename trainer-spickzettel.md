@@ -71,6 +71,7 @@ Diesen Satz am Anfang sagen und am Ende wieder aufgreifen.
 | Lesen: 404/400 | Liste in **dieser** Site vorhanden? Picker liefert die Id — URL `lists(guid'...')`. |
 | Schreiben: 403 | Teilnehmer-Account braucht **Bearbeiten**-Rechte, nicht nur Lesen. |
 | Anlegen: Metadaten-/„type"-Fehler | `odata=nometadata` in Accept **und** Content-type. |
+| Schreiben: „OData-Version … 3.0 or 4.0" | `'odata-version': ''` aus den Headern entfernen — `SPHttpClient.configurations.v1` validiert ihn, der Client setzt selbst einen gültigen Wert. |
 | Tabelle aktualisiert sich nach Schreiben nicht | Nach der Schreiboperation `_ladeListe()` / `this._load()` aufrufen. |
 | `@pnp/sp`-Compile-Fehler | Falsche Version installiert. Nur `@pnp/sp@1.3.11` (v1) passt zu SPFx 1.4.1 / TS 2.4.2. |
 | `?.` / `??` Compile-Fehler | TS 2.4.2 kennt das nicht. `||` / `&&` verwenden. |

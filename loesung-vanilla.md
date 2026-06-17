@@ -212,8 +212,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
       SPHttpClient.configurations.v1, {
         headers: {
           'Accept': 'application/json;odata=nometadata',
-          'Content-type': 'application/json;odata=nometadata',
-          'odata-version': ''
+          'Content-type': 'application/json;odata=nometadata'
         },
         body: JSON.stringify({ Title: titel })
       })
@@ -228,7 +227,6 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
         headers: {
           'Accept': 'application/json;odata=nometadata',
           'Content-type': 'application/json;odata=nometadata',
-          'odata-version': '',
           'IF-MATCH': '*',
           'X-HTTP-Method': 'MERGE'
         },
@@ -242,7 +240,7 @@ export default class ListEditorWebPart extends BaseClientSideWebPart<IListEditor
   private _loeschen(id: number): Promise<void> {
     return this.context.spHttpClient.post(this._baseUrl() + `/items(${id})`,
       SPHttpClient.configurations.v1, {
-        headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE', 'odata-version': '' }
+        headers: { 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' }
       })
       .then((antwort: SPHttpClientResponse): void => {
         if (!antwort.ok) { throw new Error('Löschen fehlgeschlagen: ' + antwort.status); }
@@ -346,6 +344,7 @@ define([], function() {
 | `Cannot find module 'ListEditorWebPartStrings'` | `loc/mystrings.d.ts` fehlt oder Modulname weicht von `config.json` ab. Generator-Default passt. |
 | Schreiben schlägt mit 403 fehl | Teilnehmer-Account braucht **Bearbeiten**-Rechte auf der Liste (Lesen reicht fürs Lesen, nicht fürs Schreiben). |
 | Anlegen schlägt mit „type" / Metadaten-Fehler fehl | `odata=nometadata` in **Accept** und **Content-type** gesetzt? Dann ist kein `__metadata.type` nötig. |
+| Schreiben bricht mit „OData-Version … 3.0 or 4.0" ab | `'odata-version': ''` aus den Headern **entfernen** — `SPHttpClient.configurations.v1` (`jsonRequest`) validiert den Header und akzeptiert nur `3.0`/`4.0`. Weglassen, der Client setzt selbst einen gültigen Wert. |
 | Tabelle aktualisiert sich nach Schreiben nicht | Nach `_anlegen`/`_bearbeiten`/`_loeschen` im `.then(...)` `_ladeListe()` aufrufen. |
 | Weiße Fläche, Konsole zeigt 403/CORS | In der `localhost`-Workbench gibt es keine echte Liste. SharePoint-gehostete Workbench nutzen. |
 | `tsc`-Fehler bei `?.` / `??` | TS 2.4.2 kennt das nicht. Nur `||` / `&&` / klassische `if`. |
